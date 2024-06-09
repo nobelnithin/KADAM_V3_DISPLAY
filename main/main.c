@@ -14,8 +14,10 @@
 #include "image.h"
 #include <string.h>
 #include "esp_timer.h"
+#include "ssd1306_i2c_new.c"
 
 #define TAG "SSD1306"
+#define TAG "MAX17260"
 
 #define CONFIG_SDA_GPIO 1
 #define CONFIG_SCL_GPIO 2
@@ -25,6 +27,7 @@
 #define BTN_DOWN GPIO_NUM_17
 #define BTN_PWR GPIO_NUM_15
 #define BTN_OK GPIO_NUM_16
+
 
 SSD1306_t dev;
 bool isDisp_menu;
@@ -48,6 +51,42 @@ uint64_t intr_time = 0;
 uint64_t curr_time = 0;
 int freq_list_index = 0;
 int freq_list[11] = {0,1,2,3,4,5,6,7,8,9,10};
+
+
+// void max_17260_init(void *params)
+// {
+//     uint16_t Soc = 0x00;
+
+//         uint8_t data[4];
+//         i2c_cmd_handle_t cmd;
+//         cmd = i2c_cmd_link_create();
+// 		ESP_ERROR_CHECK(i2c_master_start(cmd));
+// 		ESP_ERROR_CHECK(i2c_master_write_byte(cmd, (I2C_ADDRESS << 1) | I2C_MASTER_WRITE, 1));
+// 		ESP_ERROR_CHECK(i2c_master_write_byte(cmd, 0x06, 4));
+// 		ESP_ERROR_CHECK(i2c_master_stop(cmd));
+// 		ESP_ERROR_CHECK(i2c_master_cmd_begin(I2C_NUM_0, cmd, 1000/portTICK_PERIOD_MS));
+// 		i2c_cmd_link_delete(cmd);
+//         while(1)
+//         {
+//             cmd = i2c_cmd_link_create();
+//             ESP_ERROR_CHECK(i2c_master_start(cmd));
+//             ESP_ERROR_CHECK(i2c_master_write_byte(cmd, (I2C_ADDRESS << 1) | I2C_MASTER_READ, 1));
+// 		    ESP_ERROR_CHECK(i2c_master_read_byte(cmd, data,   0));
+// 		    ESP_ERROR_CHECK(i2c_master_read_byte(cmd, data+1, 0));
+//             ESP_ERROR_CHECK(i2c_master_read_byte(cmd, data+2,   0));
+// 		    ESP_ERROR_CHECK(i2c_master_read_byte(cmd, data+3, 1));
+//             ESP_ERROR_CHECK(i2c_master_stop(cmd));
+//             ESP_ERROR_CHECK(i2c_master_cmd_begin(I2C_NUM_0, cmd, 1000 / portTICK_PERIOD_MS));
+//             i2c_cmd_link_delete(cmd);
+    
+//             Soc = (data[2]<<8) | data[3];
+            
+//         //    printf("charge: %u\n",Soc);
+//             printf("%u \n",data[1]);
+//             vTaskDelay(1000/portTICK_PERIOD_MS);
+//         }
+
+// }
 
 void display_logo()
 {
@@ -95,9 +134,6 @@ void disp_setup()
             ssd1306_bitmaps(&dev, 50, 15, flash, 32, 26, false);
             ssd1306_bitmaps(&dev, 106, 35,str_num[freq_list_index-1], 16,9,false);
     }
-
-    
-
 }
 
 // void display(void *params)
@@ -289,6 +325,12 @@ void app_main(void)
         return;
     }
 
+    float soc = max17260_read_soc();
+    if (soc >= 0) 
+    {
+        ESP_LOGI(TAG, "State of Charge: %.2f%%", soc);
+    }
+
     // gpio_set_direction(BTN_UP, GPIO_MODE_INPUT);
     // gpio_set_intr_type(BTN_UP, GPIO_INTR_NEGEDGE);
     // gpio_set_direction(BTN_DOWN, GPIO_MODE_INPUT);
@@ -308,6 +350,7 @@ void app_main(void)
     xTaskCreate(BTN_DOWNTask, "BTN_DOWNTask", 2048, NULL, 1, NULL);
     xTaskCreate(BTN_PWRTask, "BTN_PWRTask", 2048, NULL, 1, NULL);
     xTaskCreate(BTN_OKTask, "BTN_OKTask", 2048, NULL, 1, NULL);
+    //xTaskCreate(max_17260_init, "max_17260_init",2048, NULL, 1, NULL);
     // xTaskCreate(display,"display",2048,NULL,1,NULL);
 
     // i2c_master_init(&dev, CONFIG_SDA_GPIO, CONFIG_SCL_GPIO, CONFIG_RESET_GPIO);

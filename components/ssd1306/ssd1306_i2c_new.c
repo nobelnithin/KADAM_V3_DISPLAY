@@ -20,8 +20,12 @@
 
 #define I2C_MASTER_FREQ_HZ 400000 // I2C clock of SSD1306 can run at 400 kHz max.
 #define I2C_TICKS_TO_WAIT 100     // Maximum ticks to wait before issuing a timeout.
+#define MAX17260_I2C_ADDRESS 0x36
+#define MAX17260_SOC_REG      0x07
 
 i2c_master_dev_handle_t dev_handle;
+i2c_master_dev_handle_t dev_handle_max17260;
+extern i2c_master_dev_handle_t dev_handle_max17260;
 
 void i2c_master_init(SSD1306_t * dev, int16_t sda, int16_t scl, int16_t reset)
 {
@@ -44,6 +48,13 @@ void i2c_master_init(SSD1306_t * dev, int16_t sda, int16_t scl, int16_t reset)
 	};
 	//i2c_master_dev_handle_t dev_handle;
 	ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &dev_handle));
+	    i2c_device_config_t max17260_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = MAX17260_I2C_ADDRESS, // Address for MAX17260
+        .scl_speed_hz = I2C_MASTER_FREQ_HZ,
+    };
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &max17260_cfg, &dev_handle_max17260));
+
 
 #if 0
 	i2c_config_t i2c_config = {
@@ -169,6 +180,24 @@ void i2c_display_image(SSD1306_t * dev, int page, int seg, uint8_t * images, int
 	free(out_buf);
 }
 
+esp_err_t max17260_read_register(uint8_t reg_addr, uint8_t *data, size_t length) {
+    // Send the register address to the device
+    esp_err_t res = i2c_master_transmit(dev_handle_max17260, &reg_addr, 1, I2C_TICKS_TO_WAIT);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to send register address: %d (%s)", res, esp_err_to_name(res));
+        return res;
+    }
+
+    // Read data from the device
+    res = i2c_master_receive(dev_handle_max17260, data, length, I2C_TICKS_TO_WAIT);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read data: %d (%s)", res, esp_err_to_name(res));
+    }
+
+    return res;
+}
+
+
 void i2c_contrast(SSD1306_t * dev, int contrast) {
 	uint8_t _contrast = contrast;
 	if (contrast < 0x0) _contrast = 0;
@@ -258,5 +287,19 @@ void i2c_hardware_scroll(SSD1306_t * dev, ssd1306_scroll_type_t scroll) {
 	esp_err_t res = i2c_master_transmit(dev_handle, out_buf, 3, I2C_TICKS_TO_WAIT);
 	if (res != ESP_OK)
 		ESP_LOGE(TAG, "Could not write to device [0x%02x at %d]: %d (%s)", dev->_address, I2C_NUM, res, esp_err_to_name(res));
+}
+
+
+float max17260_read_soc(void) {
+    uint8_t data[2];
+    esp_err_t res = max17260_read_register(MAX17260_SOC_REG, data, 2);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read SOC");
+        return -1;
+    }
+    uint16_t soc_raw = (data[1] << 8) | data[0];
+	return data[1];
+    // Convert to SOC percentage
+    //return soc_raw * 1.0e-2; // Each LSB represents 0.01%
 }
 

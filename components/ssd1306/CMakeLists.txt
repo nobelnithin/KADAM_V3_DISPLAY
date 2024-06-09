@@ -4,9 +4,9 @@ set(component_srcs "ssd1306.c" "ssd1306_spi.c")
 set(idf_version "${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}")
 
 if(idf_version VERSION_GREATER_EQUAL "5.2")
-	list(APPEND component_srcs "ssd1306_i2c_new.c")
+	list(APPEND component_srcs)
 else()
 	list(APPEND component_srcs "ssd1306_i2c_legacy.c")
 endif()
 
-idf_component_register(SRCS "${component_srcs}" PRIV_REQUIRES driver INCLUDE_DIRS ".")
+idf_component_register(SRCS "ssd1306_i2c_new.c" "${component_srcs}" PRIV_REQUIRES driver INCLUDE_DIRS ".")
