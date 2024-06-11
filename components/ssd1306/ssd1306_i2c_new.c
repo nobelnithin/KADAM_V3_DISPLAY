@@ -180,6 +180,8 @@ void i2c_display_image(SSD1306_t * dev, int page, int seg, uint8_t * images, int
 	free(out_buf);
 }
 
+
+
 esp_err_t max17260_read_register(uint8_t reg_addr, uint8_t *data, size_t length) {
     // Send the register address to the device
     esp_err_t res = i2c_master_transmit(dev_handle_max17260, &reg_addr, 1, I2C_TICKS_TO_WAIT);
@@ -213,6 +215,7 @@ void i2c_contrast(SSD1306_t * dev, int contrast) {
 	if (res != ESP_OK)
 		ESP_LOGE(TAG, "Could not write to device [0x%02x at %d]: %d (%s)", dev->_address, I2C_NUM, res, esp_err_to_name(res));
 }
+
 
 
 void i2c_hardware_scroll(SSD1306_t * dev, ssd1306_scroll_type_t scroll) {

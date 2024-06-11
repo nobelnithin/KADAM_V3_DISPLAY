@@ -106,23 +106,25 @@ void disp_menu()
     char display_str[20];
     int frequency = freq_list_index;
     snprintf(str,sizeof(str),"%d",frequency);
+    snprintf(display_str,sizeof(display_str),"Setup         %s",str);
+    ESP_LOGI(TAG, "State of Charge: %.2f%%", soc);
     if(soc>75.0)
     {
         ssd1306_bitmaps(&dev, 100, 5, battery_100, 32, 17, false);        
     }
-    else if(soc<75.0&&soc>50.0)
+    if(soc<75.0&&soc>50.0)
     {
         ssd1306_bitmaps(&dev, 100, 5, battery_75, 32, 17, false);
     }
-    else if(soc<50.0&&soc>25.0)
+    if(soc<50.0&&soc>25.0)
     {
         ssd1306_bitmaps(&dev, 100, 5, battery_50, 32, 17, false);
     }
-        else if(soc<25.0)
+    if(soc<25.0)
     {
         ssd1306_bitmaps(&dev, 100, 5, battery_low, 32, 17, false);
     }
-    snprintf(display_str,sizeof(display_str),"Setup         %s",str);
+
     if(isDisp_menu1)
     {
         
@@ -135,6 +137,7 @@ void disp_menu()
         ssd1306_display_text(&dev,3, display_str,strlen(display_str),false);
         ssd1306_display_text(&dev, 5, "Walk           ", 16, true);
     }
+    
 
 }
 
@@ -151,6 +154,40 @@ void disp_setup()
             ssd1306_bitmaps(&dev, 50, 15, flash, 32, 26, false);
             ssd1306_bitmaps(&dev, 106, 35,str_num[freq_list_index-1], 16,9,false);
     }
+}
+
+void disp_walk()
+{
+    ssd1306_clear_screen(&dev, false);
+	int count = 6;
+	uint8_t segs[128];
+	while(1) {
+		TickType_t startTick = xTaskGetTickCount();
+		// 1Ticks required
+		for (int page=0;page<8;page++) {
+			for (int seg=0;seg<128;seg++) {
+				segs[seg] =  ssd1306_rotate_byte(walk[count][seg*8+page]);
+			}
+			ssd1306_display_image(&dev, page, 0, segs, 128);
+		}
+#if 0
+		int index = 0;
+		// 26Ticks required
+		for (int seg=0;seg<128;seg++) {
+			for (int page=0;page<8;page++) {
+				uint8_t wk[1];
+				wk[0] = monkeyAnimation[count][index++];
+				wk[0] = ssd1306_rotate_byte(wk[0]);
+				ssd1306_display_image(&dev, page, seg, wk, 1);
+			}
+		}
+#endif
+		TickType_t endTick = xTaskGetTickCount();
+		ESP_LOGD(TAG, "diffTick=%"PRIu32, endTick - startTick);
+		count--;
+		if (count<0) count = 6;
+		vTaskDelay(6);
+	}
 }
 
 // void display(void *params)
@@ -222,7 +259,18 @@ void BTN_DOWNTask(void *params)
             {
                 isDisp_menu1=false;
                 isDisp_menu2=true;
+                disp_menu();
             }
+            if(isDisp_setup)
+            {
+                
+                if(freq_list_index>0)
+                {
+                    freq_list_index--;
+                }
+                disp_setup();
+            }
+
             
             xQueueReset(BTN_DOWNQueue);
         }
@@ -269,6 +317,9 @@ void BTN_OKTask(void *params)
                 {
                     printf("disp walk true\n");
                     isDisp_walk=true;
+                    isDisp_menu=false;
+                    isDisp_setup=false;
+                    disp_walk();
                 }
             }
             else if(isDisp_setup)
@@ -289,15 +340,16 @@ void get_soc(void *params)
 while(1)
 {
     soc = max17260_read_soc();
-    if (soc >= 0) 
-    {
-        ESP_LOGI(TAG, "State of Charge: %.2f%%", soc);
+    // if (soc >= 0) 
+    // {
+    //     ESP_LOGI(TAG, "State of Charge: %.2f%%", soc);
 
-    }
+    // }
     vTaskDelay(5000/portTICK_PERIOD_MS);
 
 }
 }
+
 static void IRAM_ATTR BTN_UP_interrupt_handler(void *args)
 {
     
@@ -342,8 +394,8 @@ static void IRAM_ATTR BTN_OK_interrupt_handler(void *args)
 void app_main(void)
 {
     i2c_master_init(&dev, CONFIG_SDA_GPIO, CONFIG_SCL_GPIO, CONFIG_RESET_GPIO);
-    display_logo();
-    disp_menu();
+    // display_logo();
+    // disp_menu();
     BTN_UPQueue = xQueueCreate(10, sizeof(int));
     BTN_DOWNQueue = xQueueCreate(10, sizeof(int));
     BTN_PWRQueue = xQueueCreate(10, sizeof(int));
@@ -356,11 +408,11 @@ void app_main(void)
         return;
     }
 
-    // float soc = max17260_read_soc();
-    // if (soc >= 0) 
-    // {
-    //     ESP_LOGI(TAG, "State of Charge: %.2f%%", soc);
-    // }
+    float soc = max17260_read_soc();
+    if (soc >= 0) 
+    {
+        ESP_LOGI(TAG, "State of Charge: %.2f%%", soc);
+    }
 
     // gpio_set_direction(BTN_UP, GPIO_MODE_INPUT);
     // gpio_set_intr_type(BTN_UP, GPIO_INTR_NEGEDGE);
@@ -382,9 +434,10 @@ void app_main(void)
     xTaskCreate(BTN_PWRTask, "BTN_PWRTask", 2048, NULL, 1, NULL);
     xTaskCreate(BTN_OKTask, "BTN_OKTask", 2048, NULL, 1, NULL);
     xTaskCreate(get_soc, "get soc",2048, NULL, 1, NULL);
+    //xTaskCreate(max_17260_init, "max_17260_init",2048, NULL, 1, NULL);
     // xTaskCreate(display,"display",2048,NULL,1,NULL);
 
     // i2c_master_init(&dev, CONFIG_SDA_GPIO, CONFIG_SCL_GPIO, CONFIG_RESET_GPIO);
-    // display_logo();
-    // disp_menu();
+    display_logo();
+    disp_menu();
 }
