@@ -1,7 +1,7 @@
 {
     "version":            "1.1",
     "project_name":       "KADAM_V3_DISPLAY",
-    "project_version":    "7bd57e6-dirty",
+    "project_version":    "a12fbd3-dirty",
     "project_path":       "C:/Biostim/Firmware/KADAM_V3_DISPLAY",
     "idf_path":           "C:/Users/Admin/esp/v5.2.1/esp-idf",
     "build_dir":          "C:/Biostim/Firmware/KADAM_V3_DISPLAY/build",

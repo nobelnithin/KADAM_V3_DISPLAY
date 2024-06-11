@@ -21,7 +21,7 @@
 #define I2C_MASTER_FREQ_HZ 400000 // I2C clock of SSD1306 can run at 400 kHz max.
 #define I2C_TICKS_TO_WAIT 100     // Maximum ticks to wait before issuing a timeout.
 #define MAX17260_I2C_ADDRESS 0x36
-#define MAX17260_SOC_REG      0x07
+#define MAX17260_SOC_REG      0x06
 
 i2c_master_dev_handle_t dev_handle;
 i2c_master_dev_handle_t dev_handle_max17260;
@@ -290,6 +290,20 @@ void i2c_hardware_scroll(SSD1306_t * dev, ssd1306_scroll_type_t scroll) {
 }
 
 
+// float max17260_read_soc(void) {
+//     uint8_t data[2];
+//     esp_err_t res = max17260_read_register(MAX17260_SOC_REG, data, 2);
+//     if (res != ESP_OK) {
+//         ESP_LOGE(TAG, "Failed to read SOC");
+//         return -1;
+//     }
+//     uint16_t soc_raw = (data[1] << 8) | data[0];
+// 	return data[1];
+//     // Convert to SOC percentage
+//     //return soc_raw * 1.0e-2; // Each LSB represents 0.01%
+// }
+
+
 float max17260_read_soc(void) {
     uint8_t data[2];
     esp_err_t res = max17260_read_register(MAX17260_SOC_REG, data, 2);
@@ -297,9 +311,7 @@ float max17260_read_soc(void) {
         ESP_LOGE(TAG, "Failed to read SOC");
         return -1;
     }
-    uint16_t soc_raw = (data[1] << 8) | data[0];
-	return data[1];
-    // Convert to SOC percentage
-    //return soc_raw * 1.0e-2; // Each LSB represents 0.01%
+    // Only return the higher byte of SOC
+    return data[1];
 }
 

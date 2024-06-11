@@ -50,6 +50,7 @@ uint64_t pre_time = 0;
 uint64_t intr_time = 0;
 uint64_t curr_time = 0;
 int freq_list_index = 0;
+float soc =0;
 int freq_list[11] = {0,1,2,3,4,5,6,7,8,9,10};
 
 
@@ -105,6 +106,22 @@ void disp_menu()
     char display_str[20];
     int frequency = freq_list_index;
     snprintf(str,sizeof(str),"%d",frequency);
+    if(soc>75.0)
+    {
+        ssd1306_bitmaps(&dev, 100, 5, battery_100, 32, 17, false);        
+    }
+    else if(soc<75.0&&soc>50.0)
+    {
+        ssd1306_bitmaps(&dev, 100, 5, battery_75, 32, 17, false);
+    }
+    else if(soc<50.0&&soc>25.0)
+    {
+        ssd1306_bitmaps(&dev, 100, 5, battery_50, 32, 17, false);
+    }
+        else if(soc<25.0)
+    {
+        ssd1306_bitmaps(&dev, 100, 5, battery_low, 32, 17, false);
+    }
     snprintf(display_str,sizeof(display_str),"Setup         %s",str);
     if(isDisp_menu1)
     {
@@ -267,6 +284,20 @@ void BTN_OKTask(void *params)
     }
 }
 
+void get_soc(void *params)
+{
+while(1)
+{
+    soc = max17260_read_soc();
+    if (soc >= 0) 
+    {
+        ESP_LOGI(TAG, "State of Charge: %.2f%%", soc);
+
+    }
+    vTaskDelay(5000/portTICK_PERIOD_MS);
+
+}
+}
 static void IRAM_ATTR BTN_UP_interrupt_handler(void *args)
 {
     
@@ -325,11 +356,11 @@ void app_main(void)
         return;
     }
 
-    float soc = max17260_read_soc();
-    if (soc >= 0) 
-    {
-        ESP_LOGI(TAG, "State of Charge: %.2f%%", soc);
-    }
+    // float soc = max17260_read_soc();
+    // if (soc >= 0) 
+    // {
+    //     ESP_LOGI(TAG, "State of Charge: %.2f%%", soc);
+    // }
 
     // gpio_set_direction(BTN_UP, GPIO_MODE_INPUT);
     // gpio_set_intr_type(BTN_UP, GPIO_INTR_NEGEDGE);
@@ -350,7 +381,7 @@ void app_main(void)
     xTaskCreate(BTN_DOWNTask, "BTN_DOWNTask", 2048, NULL, 1, NULL);
     xTaskCreate(BTN_PWRTask, "BTN_PWRTask", 2048, NULL, 1, NULL);
     xTaskCreate(BTN_OKTask, "BTN_OKTask", 2048, NULL, 1, NULL);
-    //xTaskCreate(max_17260_init, "max_17260_init",2048, NULL, 1, NULL);
+    xTaskCreate(get_soc, "get soc",2048, NULL, 1, NULL);
     // xTaskCreate(display,"display",2048,NULL,1,NULL);
 
     // i2c_master_init(&dev, CONFIG_SDA_GPIO, CONFIG_SCL_GPIO, CONFIG_RESET_GPIO);
