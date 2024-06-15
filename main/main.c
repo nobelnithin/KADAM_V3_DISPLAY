@@ -15,6 +15,7 @@
 #include <string.h>
 #include "esp_timer.h"
 #include "ssd1306_i2c_new.c"
+#include "esp_sleep.h"
 
 #define TAG "SSD1306"
 #define TAG "MAX17260"
@@ -46,48 +47,27 @@ uint32_t pre_time_up = 0;
 uint32_t pre_time_down = 0;
 uint32_t pre_time_pwr = 0;
 uint32_t pre_time_ok = 0;
-uint64_t pre_time = 0;
+uint64_t pre_time= 0;
 uint64_t intr_time = 0;
 uint64_t curr_time = 0;
 int freq_list_index = 0;
 float soc =0;
-int freq_list[11] = {0,1,2,3,4,5,6,7,8,9,10};
+int freq_list[11] = {0,1,2,3,4,5,6,7,8,9};
+
+bool long_press_detected = false;
+bool animation_running = false;
 
 
-// void max_17260_init(void *params)
-// {
-//     uint16_t Soc = 0x00;
 
-//         uint8_t data[4];
-//         i2c_cmd_handle_t cmd;
-//         cmd = i2c_cmd_link_create();
-// 		ESP_ERROR_CHECK(i2c_master_start(cmd));
-// 		ESP_ERROR_CHECK(i2c_master_write_byte(cmd, (I2C_ADDRESS << 1) | I2C_MASTER_WRITE, 1));
-// 		ESP_ERROR_CHECK(i2c_master_write_byte(cmd, 0x06, 4));
-// 		ESP_ERROR_CHECK(i2c_master_stop(cmd));
-// 		ESP_ERROR_CHECK(i2c_master_cmd_begin(I2C_NUM_0, cmd, 1000/portTICK_PERIOD_MS));
-// 		i2c_cmd_link_delete(cmd);
-//         while(1)
-//         {
-//             cmd = i2c_cmd_link_create();
-//             ESP_ERROR_CHECK(i2c_master_start(cmd));
-//             ESP_ERROR_CHECK(i2c_master_write_byte(cmd, (I2C_ADDRESS << 1) | I2C_MASTER_READ, 1));
-// 		    ESP_ERROR_CHECK(i2c_master_read_byte(cmd, data,   0));
-// 		    ESP_ERROR_CHECK(i2c_master_read_byte(cmd, data+1, 0));
-//             ESP_ERROR_CHECK(i2c_master_read_byte(cmd, data+2,   0));
-// 		    ESP_ERROR_CHECK(i2c_master_read_byte(cmd, data+3, 1));
-//             ESP_ERROR_CHECK(i2c_master_stop(cmd));
-//             ESP_ERROR_CHECK(i2c_master_cmd_begin(I2C_NUM_0, cmd, 1000 / portTICK_PERIOD_MS));
-//             i2c_cmd_link_delete(cmd);
-    
-//             Soc = (data[2]<<8) | data[3];
-            
-//         //    printf("charge: %u\n",Soc);
-//             printf("%u \n",data[1]);
-//             vTaskDelay(1000/portTICK_PERIOD_MS);
-//         }
 
-// }
+void enter_deep_sleep() {
+    ESP_LOGI("NO TAG", "Entering deep sleep in 500ms");
+    vTaskDelay(500 / portTICK_PERIOD_MS); // Wait for 500ms to ensure button is released
+    esp_sleep_enable_ext0_wakeup(BTN_PWR, 0); // Wake up when button is pressed (falling edge)
+    ssd1306_clear_screen(&dev, false);
+    esp_deep_sleep_start();
+}
+
 
 void display_logo()
 {
@@ -100,14 +80,16 @@ void display_logo()
 
 void disp_menu()
 {
+    
     isDisp_setup = false;
+    isDisp_walk=false;
     isDisp_menu=true;
     char str[4];
     char display_str[20];
-    int frequency = freq_list_index;
+    int frequency = freq_list[freq_list_index];
     snprintf(str,sizeof(str),"%d",frequency);
-    snprintf(display_str,sizeof(display_str),"Setup         %s",str);
-    ESP_LOGI(TAG, "State of Charge: %.2f%%", soc);
+    snprintf(display_str,sizeof(display_str)," Setup        %s",str);
+    //ESP_LOGI(TAG, "State of Charge: %.2f%%", soc);
     if(soc>75.0)
     {
         ssd1306_bitmaps(&dev, 100, 5, battery_100, 32, 17, false);        
@@ -129,13 +111,13 @@ void disp_menu()
     {
         
         ssd1306_display_text(&dev,3, display_str,strlen(display_str),true);
-        ssd1306_display_text(&dev, 5, "Walk         ", 16, false);
+        ssd1306_display_text(&dev, 5, " Walk        ", 16, false);
     }
     if(isDisp_menu2)
     {
         
         ssd1306_display_text(&dev,3, display_str,strlen(display_str),false);
-        ssd1306_display_text(&dev, 5, "Walk           ", 16, true);
+        ssd1306_display_text(&dev, 5, " Walk          ", 16, true);
     }
     
 
@@ -152,62 +134,63 @@ void disp_setup()
     if(freq_list_index>0)
     {
             ssd1306_bitmaps(&dev, 50, 15, flash, 32, 26, false);
-            ssd1306_bitmaps(&dev, 106, 35,str_num[freq_list_index-1], 16,9,false);
+            ssd1306_bitmaps(&dev, 106, 35,str_num[freq_list_index], 16,9,false);
     }
 }
 
-void disp_walk()
+
+
+void disp_walk(void *params)
 {
     ssd1306_clear_screen(&dev, false);
-	int count = 6;
-	uint8_t segs[128];
-	while(1) {
-		TickType_t startTick = xTaskGetTickCount();
-		// 1Ticks required
-		for (int page=0;page<8;page++) {
-			for (int seg=0;seg<128;seg++) {
-				segs[seg] =  ssd1306_rotate_byte(walk[count][seg*8+page]);
-			}
-			ssd1306_display_image(&dev, page, 0, segs, 128);
-		}
-#if 0
-		int index = 0;
-		// 26Ticks required
-		for (int seg=0;seg<128;seg++) {
-			for (int page=0;page<8;page++) {
-				uint8_t wk[1];
-				wk[0] = monkeyAnimation[count][index++];
-				wk[0] = ssd1306_rotate_byte(wk[0]);
-				ssd1306_display_image(&dev, page, seg, wk, 1);
-			}
-		}
-#endif
-		TickType_t endTick = xTaskGetTickCount();
-		ESP_LOGD(TAG, "diffTick=%"PRIu32, endTick - startTick);
-		count--;
-		if (count<0) count = 6;
-		vTaskDelay(6);
-	}
+    int count = 6;
+    uint8_t segs[128];
+
+    // Set the button pin as input
+    //gpio_set_direction(BTN_UP, GPIO_MODE_INPUT);
+
+    // Continue displaying animation while the button is pressed
+    while (1) {
+        if(animation_running==1)
+        {
+           TickType_t startTick = xTaskGetTickCount();
+
+        // Display animation frame
+        for (int page = 0; page < 8; page++) {
+            for (int seg = 0; seg < 128; seg++) {
+                segs[seg] = ssd1306_rotate_byte(walk[count][seg * 8 + page]);
+            }
+            ssd1306_display_image(&dev, page, 0, segs, 128);
+        }
+
+        TickType_t endTick = xTaskGetTickCount();
+        ESP_LOGD(TAG, "diffTick=%"PRIu32, endTick - startTick);
+
+        count--;
+        if (count < 0) count = 6;
+
+        vTaskDelay(6/portTICK_PERIOD_MS);
+        }
+        // else if(animation_running==0)
+        // {
+        //     ssd1306_clear_screen(&dev, false);
+        // }
+
+
+        // Check if the button is still pressed
+
+        vTaskDelay(100/portTICK_PERIOD_MS);
+        
+    }
+
+     // Clear the screen when stopping the animation
+    //disp_menu(); // Optionally return to the menu
+    //animation_running = false;
+
+        
+
+    
 }
-
-// void display(void *params)
-// {
-//     while(1)
-//     {
-//         if(isDisp_menu)
-//         {
-//             printf("menu func called\n");
-//             disp_menu();
-//         }
-//         if(isDisp_setup)
-//         {
-//             printf("set func called\n");
-//             disp_setup();
-//         }
-//     vTaskDelay(10/portTICK_PERIOD_MS);
-//     }
-
-// }
 
 
 void BTN_UPTask(void *param)
@@ -287,10 +270,34 @@ void BTN_PWRTask(void *params)
         if (xQueueReceive(BTN_PWRQueue, &BTN_NUMBER, portMAX_DELAY))
         {
             ESP_LOGI(TAG, "Task BTN_PWRTask: Button power pressed (15)!");
-            
+            long_press_detected = false;
+
+            while (gpio_get_level(BTN_PWR) == 0 && !long_press_detected)
+            {
+                curr_time = esp_timer_get_time();
+
+                if (curr_time - intr_time >= 1000000) // Check for long press duration
+                {
+                    ESP_LOGI("NO TAG", "Long Press Detected");
+                    long_press_detected = true; // Set long press flag
+                    enter_deep_sleep(); // Enter deep sleep on long press
+                }
+
+                if (gpio_get_level(BTN_PWR) == 1)
+                {
+                    if (curr_time - intr_time < 1000000)
+                    {
+                        ESP_LOGI("NO TAG", "Short Press Detected");
+                        long_press_detected = true;
+                    }
+                }
+            }
+
             xQueueReset(BTN_PWRQueue);
         }
     }
+            
+
 }
 
 void BTN_OKTask(void *params)
@@ -302,6 +309,7 @@ void BTN_OKTask(void *params)
     {
         if (xQueueReceive(BTN_OKQueue, &BTN_NUMBER, portMAX_DELAY))
         {
+            printf("Ok button pressed\n");
             if(isDisp_menu)
             {
                 if(isDisp_menu1)
@@ -311,6 +319,7 @@ void BTN_OKTask(void *params)
                     isDisp_menu = false;
                     ssd1306_clear_screen(&dev, false);
                     ssd1306_bitmaps(&dev, 0, 0, setup_1, 128, 64, false);
+                    ssd1306_bitmaps(&dev, 106, 35,str_num[0], 16,9,false);
                     disp_setup();
                 }
                 if(isDisp_menu2)
@@ -319,18 +328,31 @@ void BTN_OKTask(void *params)
                     isDisp_walk=true;
                     isDisp_menu=false;
                     isDisp_setup=false;
-                    disp_walk();
+                    animation_running = true;
+                    printf("%d\n",animation_running);
+                    
+
                 }
             }
+
             else if(isDisp_setup)
             {
 
                 ssd1306_clear_screen(&dev, false);
                 disp_menu();
             }
-
+            else if(isDisp_walk)
+            {
+                isDisp_walk=false;
+                isDisp_setup=false;
+                isDisp_menu=true;
+                animation_running = false;
+                ssd1306_clear_screen(&dev, false);
+                disp_menu();
+            }
             
             xQueueReset(BTN_OKQueue);
+
         }
     }
 }
@@ -432,8 +454,9 @@ void app_main(void)
     xTaskCreate(BTN_UPTask, "BTN_UPTask", 2048, NULL, 1, NULL);
     xTaskCreate(BTN_DOWNTask, "BTN_DOWNTask", 2048, NULL, 1, NULL);
     xTaskCreate(BTN_PWRTask, "BTN_PWRTask", 2048, NULL, 1, NULL);
-    xTaskCreate(BTN_OKTask, "BTN_OKTask", 2048, NULL, 1, NULL);
-    xTaskCreate(get_soc, "get soc",2048, NULL, 1, NULL);
+    xTaskCreate(BTN_OKTask, "BTN_OKTask", 8000, NULL, 1, NULL);
+    xTaskCreate(get_soc, "get soc",8000, NULL, 1, NULL);
+    xTaskCreate(disp_walk, "display walk",2048, NULL, 1, NULL);
     //xTaskCreate(max_17260_init, "max_17260_init",2048, NULL, 1, NULL);
     // xTaskCreate(display,"display",2048,NULL,1,NULL);
 
