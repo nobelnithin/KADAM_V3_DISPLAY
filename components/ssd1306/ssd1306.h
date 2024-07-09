@@ -151,6 +151,7 @@ void spi_init(SSD1306_t * dev, int width, int height);
 void spi_display_image(SSD1306_t * dev, int page, int seg, uint8_t * images, int width);
 void spi_contrast(SSD1306_t * dev, int contrast);
 void spi_hardware_scroll(SSD1306_t * dev, ssd1306_scroll_type_t scroll);
+esp_err_t max17260_read_register(uint8_t reg_addr, uint8_t *data, size_t length);
 
 #ifdef __cplusplus
 }

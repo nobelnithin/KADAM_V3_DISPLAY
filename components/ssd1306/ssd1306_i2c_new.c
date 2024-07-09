@@ -195,7 +195,6 @@ esp_err_t max17260_read_register(uint8_t reg_addr, uint8_t *data, size_t length)
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read data: %d (%s)", res, esp_err_to_name(res));
     }
-
     return res;
 }
 

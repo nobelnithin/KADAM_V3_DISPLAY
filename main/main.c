@@ -135,6 +135,13 @@ void disp_setup()
     {
             ssd1306_bitmaps(&dev, 50, 15, flash, 32, 26, false);
             ssd1306_bitmaps(&dev, 106, 35,str_num[freq_list_index], 16,9,false);
+            printf("freq_list_index %d\n",freq_list_index);
+    }
+    else if(freq_list_index==0)
+    {
+        ssd1306_bitmaps(&dev, 0, 0, setup_1, 128, 64, false);
+        ssd1306_bitmaps(&dev, 106, 35,str_num[freq_list_index], 16,9,false);
+        printf("freq_list_index %d\n",freq_list_index);
     }
 }
 
@@ -318,8 +325,8 @@ void BTN_OKTask(void *params)
                     isDisp_setup=true;
                     isDisp_menu = false;
                     ssd1306_clear_screen(&dev, false);
-                    ssd1306_bitmaps(&dev, 0, 0, setup_1, 128, 64, false);
-                    ssd1306_bitmaps(&dev, 106, 35,str_num[0], 16,9,false);
+                    // ssd1306_bitmaps(&dev, 0, 0, setup_1, 128, 64, false);
+                    // ssd1306_bitmaps(&dev, 106, 35,str_num[0], 16,9,false);
                     disp_setup();
                 }
                 if(isDisp_menu2)
@@ -453,7 +460,7 @@ void app_main(void)
 
     xTaskCreate(BTN_UPTask, "BTN_UPTask", 2048, NULL, 1, NULL);
     xTaskCreate(BTN_DOWNTask, "BTN_DOWNTask", 2048, NULL, 1, NULL);
-    xTaskCreate(BTN_PWRTask, "BTN_PWRTask", 2048, NULL, 1, NULL);
+    xTaskCreate(BTN_PWRTask, "BTN_PWRTask", 8000, NULL, 1, NULL);
     xTaskCreate(BTN_OKTask, "BTN_OKTask", 8000, NULL, 1, NULL);
     xTaskCreate(get_soc, "get soc",8000, NULL, 1, NULL);
     xTaskCreate(disp_walk, "display walk",2048, NULL, 1, NULL);
